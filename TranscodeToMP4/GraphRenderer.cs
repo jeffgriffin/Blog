@@ -5,100 +5,53 @@ using System.Text;
 using DirectShowLib;
 using WPFMediaKit.DirectShow.Controls;
 using System.Windows;
+using TranscodeToMP4.ViewModel;
+using System.Runtime.InteropServices;
+using WPFMediaKit.Threading;
+using System.Windows.Data;
 
 namespace TranscodeToMP4
 {
-    public class GraphRendererElement : MediaElementBase
+    public class GraphPlayerElement : MediaElementBase
     {
         protected override WPFMediaKit.DirectShow.MediaPlayers.MediaPlayerBase OnRequestMediaPlayer()
         {
-            return new GraphRenderer();
+            return new GraphPlayer();
         }
 
-        public static readonly DependencyProperty GraphProperty =
-            DependencyProperty.Register("Graph", typeof(IGraphBuilder), typeof(GraphRendererElement),
-                new FrameworkPropertyMetadata(null, new PropertyChangedCallback(OnGraphChanged)));
+        public static readonly DependencyProperty GraphPlayerProperty =
+            DependencyProperty.Register("GraphPlayer", typeof(GraphPlayer), typeof(GraphPlayerElement),
+            new PropertyMetadata());
 
-        public IGraphBuilder Graph
+        public GraphPlayer GraphPlayer
         {
-            get { return (IGraphBuilder)GetValue(GraphProperty); }
-            set { SetValue(GraphProperty, value); }
+            get { return (GraphPlayer)GetValue(GraphPlayerProperty); }
+            set { SetValue(GraphPlayerProperty, value); }
         }
 
-        private static void OnGraphChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        protected override void OnInitialized(EventArgs e)
         {
-            ((GraphRendererElement)d).OnGraphChanged(e);
-        }
-
-        protected virtual void OnGraphChanged(DependencyPropertyChangedEventArgs e)
-        {
-            ((GraphRenderer)MediaPlayerBase).Graph = (IGraphBuilder)e.NewValue;
-            ((GraphRenderer)MediaPlayerBase).ProcessBindings();
-        }
-
-        public static readonly DependencyProperty PinProperty =
-            DependencyProperty.Register("Pin", typeof(IPin), typeof(GraphRendererElement),
-                new FrameworkPropertyMetadata(null, new PropertyChangedCallback(OnPinChanged)));
-
-        public IPin Pin
-        {
-            get { return (IPin)GetValue(PinProperty); }
-            set { SetValue(PinProperty, value); }
-        }
-
-        private static void OnPinChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            ((GraphRendererElement)d).OnPinChanged(e);
-        }
-
-        protected virtual void OnPinChanged(DependencyPropertyChangedEventArgs e)
-        {
-            ((GraphRenderer)MediaPlayerBase).Pin = (IPin)e.NewValue;
-            ((GraphRenderer)MediaPlayerBase).ProcessBindings();
+            base.OnInitialized(e);
+            GraphPlayer = (GraphPlayer)MediaPlayerBase;
         }
     }
 
-    public class GraphRenderer : WPFMediaKit.DirectShow.MediaPlayers.MediaPlayerBase
+    public class GraphPlayer : WPFMediaKit.DirectShow.MediaPlayers.MediaPlayerBase
     {
-        public IGraphBuilder Graph
+        public void SetSharedDispatcher(WorkDispatcher dispatcher)
         {
-            get;
-            set;
+            Dispatcher.BeginInvokeShutdown();
+            Dispatcher = dispatcher;
         }
 
-        public IPin Pin
+        public IBaseFilter CreateRenderer(IGraphBuilder graph)
         {
-            get;
-            set;
-        }
-
-        public void ProcessBindings()
-        {
-            if (Graph == null || Pin == null)
-                return;
-
-            IBaseFilter renderer = CreateVideoRenderer(WPFMediaKit.DirectShow.MediaPlayers.VideoRendererType.VideoMixingRenderer9, Graph);
-
-            var filterGraph = Graph as IFilterGraph2;
-
-            if (filterGraph == null)
-                throw new Exception("Could not QueryInterface for the IFilterGraph2");
-
-            IBaseFilter sourceFilter;
-
-            var mixer = renderer as IVMRMixerControl9;
-
-            if (mixer != null)
+            if (!CheckAccess())
             {
-                VMR9MixerPrefs dwPrefs;
-                mixer.GetMixingPrefs(out dwPrefs);
-                dwPrefs &= ~VMR9MixerPrefs.RenderTargetMask;
-                dwPrefs |= VMR9MixerPrefs.RenderTargetRGB;
-                //mixer.SetMixingPrefs(dwPrefs);
+                Dispatcher.BeginInvoke((Action)(()=>CreateRenderer(graph)));
             }
 
-            int hr = filterGraph.RenderEx(Pin, AMRenderExFlags.RenderToExistingRenderers, IntPtr.Zero);
-            DsError.ThrowExceptionForHR(hr);
+            return CreateVideoRenderer(WPFMediaKit.DirectShow.MediaPlayers.VideoRendererType.VideoMixingRenderer9, graph);
         }
     }
 }

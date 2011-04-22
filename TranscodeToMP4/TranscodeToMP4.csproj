@@ -120,9 +120,6 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="VideoRendererElement.dll" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\..\DirectShowLib\src\DirectShowLib-2005.csproj">
       <Project>{F216C75B-1156-40BC-8587-63C59583D852}</Project>
       <Name>DirectShowLib-2005</Name>

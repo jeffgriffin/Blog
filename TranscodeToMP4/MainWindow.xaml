@@ -13,17 +13,18 @@
         <GroupBox Header="Ouptut">
             <StackPanel>
                 <ComboBox ItemsSource="{Binding AudioCompressorNames}" SelectedValue="{Binding CurrentAudioCompressorName}"/>
-                <Button Content="Audio Compressor Properties"/>
+                <Button Content="Audio Compressor Properties" Command="{Binding AudioEncoderPropertiesCommand}"/>
                 <ComboBox ItemsSource="{Binding VideoCompressorNames}" SelectedValue="{Binding CurrentVideoCompressorName}"/>
-                <Button Content="Video Compressor Properties"/>
+                <Button Content="Video Compressor Properties" Command="{Binding VideoEncoderPropertiesCommand}"/>
                 <Button Content="Export File Name..." />
                 <Button Content="Transcode!" Command="{Binding TranscodeCommand}" />
                 <StackPanel HorizontalAlignment="Right">
-                    <Local:GraphRendererElement Graph="{Binding Graph}" Pin="{Binding PreviewPin}" Width="160" Height="120"/>
+                    <Local:GraphPlayerElement x:Name="_graphPlayerElement" GraphPlayer="{Binding GraphPlayer, Mode=OneWayToSource}" Width="160" Height="120"/>
                     <CheckBox Content="Show Preview" HorizontalAlignment="Center"/>
                 </StackPanel>
                 <ProgressBar Height="25" Value="{Binding ProgressValue, Mode=OneWay}" IsIndeterminate="{Binding ProgressIsIndeterminite}"
                              Minimum="{Binding ProgressMin}" Maximum="{Binding ProgressMax}"/>
+                <Button Content="Cancel" Command="{Binding CancelCommand}"/>
             </StackPanel>
         </GroupBox>
     </StackPanel>
