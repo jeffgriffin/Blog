@@ -3,29 +3,34 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:Local="clr-namespace:TranscodeToMP4"
         Title="Transcode to MP4"
-        SizeToContent="WidthAndHeight">
-    <StackPanel>
-        <GroupBox Header="Input">
-            <StackPanel>
-                <Button Content="Import Video File..." Command="{Binding ChooseSourceFileCommand}" />
-            </StackPanel>
-        </GroupBox>
-        <GroupBox Header="Ouptut">
-            <StackPanel>
-                <ComboBox ItemsSource="{Binding AudioCompressorNames}" SelectedValue="{Binding CurrentAudioCompressorName}"/>
-                <Button Content="Audio Compressor Properties" Command="{Binding AudioEncoderPropertiesCommand}"/>
-                <ComboBox ItemsSource="{Binding VideoCompressorNames}" SelectedValue="{Binding CurrentVideoCompressorName}"/>
-                <Button Content="Video Compressor Properties" Command="{Binding VideoEncoderPropertiesCommand}"/>
-                <Button Content="Export File Name..." />
-                <Button Content="Transcode!" Command="{Binding TranscodeCommand}" />
-                <StackPanel HorizontalAlignment="Right">
-                    <Local:GraphPlayerElement x:Name="_graphPlayerElement" GraphPlayer="{Binding GraphPlayer, Mode=OneWayToSource}" Width="160" Height="120"/>
-                    <CheckBox Content="Show Preview" HorizontalAlignment="Center"/>
+        Width="640"
+        Height="480"
+        Background="Black">
+    <Grid>
+        <Local:GraphPlayerElement GraphPlayer="{Binding GraphPlayer, Mode=OneWayToSource}"/>
+        <StackPanel>
+            <GroupBox Header="Input">
+                <StackPanel>
+                    <Button Content="Import Video File..." Command="{Binding ChooseSourceFileCommand}" />
                 </StackPanel>
-                <ProgressBar Height="25" Value="{Binding ProgressValue, Mode=OneWay}" IsIndeterminate="{Binding ProgressIsIndeterminite}"
+            </GroupBox>
+            <GroupBox Header="Ouptut">
+                <StackPanel>
+                    <ComboBox ItemsSource="{Binding AudioCompressorNames}" SelectedValue="{Binding CurrentAudioCompressorName}"/>
+                    <Button Content="Audio Compressor Properties" Command="{Binding AudioEncoderPropertiesCommand}"/>
+                    <ComboBox ItemsSource="{Binding VideoCompressorNames}" SelectedValue="{Binding CurrentVideoCompressorName}"/>
+                    <Button Content="Video Compressor Properties" Command="{Binding VideoEncoderPropertiesCommand}"/>
+                    <Button Content="Export File Name..." />
+                    <Button Content="Transcode!" Command="{Binding TranscodeCommand}" />
+                    <StackPanel HorizontalAlignment="Right">
+                        <!--<Local:GraphPlayerElement x:Name="_graphPlayerElement" GraphPlayer="{Binding GraphPlayer, Mode=OneWayToSource}" Width="160" Height="120"/>-->
+                        <CheckBox Content="Show Preview" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <ProgressBar Height="25" Value="{Binding ProgressValue, Mode=OneWay}" IsIndeterminate="{Binding ProgressIsIndeterminate}"
                              Minimum="{Binding ProgressMin}" Maximum="{Binding ProgressMax}"/>
-                <Button Content="Cancel" Command="{Binding CancelCommand}"/>
-            </StackPanel>
-        </GroupBox>
-    </StackPanel>
+                    <Button Content="Cancel" Command="{Binding CancelCommand}"/>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+    </Grid>
 </Window>

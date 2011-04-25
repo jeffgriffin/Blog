@@ -39,6 +39,10 @@
     <StartupObject>TranscodeToMP4.App</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DirectShowLib-2005, Version=2.1.0.19988, Culture=neutral, PublicKeyToken=67e7b740cdfc2d3f, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Ref\DirectShowLib-2005.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.Practices.EnterpriseLibrary.Common, Version=5.0.414.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\EntLib50Src\bin\Microsoft.Practices.EnterpriseLibrary.Common.dll</HintPath>
@@ -69,6 +73,10 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="WPFMediaKit, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Ref\WPFMediaKit.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -96,6 +104,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Resource Include="Themes\BureauBlack.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Resource>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -120,22 +132,15 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\DirectShowLib\src\DirectShowLib-2005.csproj">
-      <Project>{F216C75B-1156-40BC-8587-63C59583D852}</Project>
-      <Name>DirectShowLib-2005</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\jmorril\WPFMediaKit\WPFMediaKit\WPFMediaKit\WPFMediaKit.csproj">
-      <Project>{6030628D-EE93-4D61-B6BE-8B6AE99F3935}</Project>
-      <Name>WPFMediaKit</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\net.visibleblue\net.visibleblue.util\net.visibleblue.util.csproj">
       <Project>{853E87B5-C2AA-4000-8C3B-82D59A473C69}</Project>
       <Name>net.visibleblue.util</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="DirectShowLib-2005.dll" />
-    <Content Include="WPFMediaKit.dll" />
+    <Content Include="Ref\DirectShowLib-2005.dll" />
+    <Content Include="Ref\Microsoft.Practices.Prism.dll" />
+    <Content Include="Ref\WPFMediaKit.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

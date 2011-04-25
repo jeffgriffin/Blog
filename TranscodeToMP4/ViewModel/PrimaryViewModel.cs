@@ -40,7 +40,48 @@ namespace TranscodeToMP4.ViewModel
 
         public PrimaryViewModel()
         {
-            EnsureThread(ApartmentState.MTA);
+            ChooseSourceFileCommand = new DelegateCommand(ChooseSource);
+            TranscodeCommand = new DelegateCommand(Transcode);
+            AudioEncoderPropertiesCommand = new DelegateCommand(
+                delegate
+                {
+                    if (Dispatcher.DispatcherThread == null)
+                        return;
+                    Dispatcher.BeginInvoke((Action)
+                        delegate
+                        {
+                            if (_audioEncoder == null)
+                                _audioEncoder = CreateAudioCompressorFilter();
+                            ShowFilterProperties(_audioEncoder);
+                        });
+                });
+            VideoEncoderPropertiesCommand = new DelegateCommand(
+                delegate
+                {
+                    if (Dispatcher.DispatcherThread == null)
+                        return;
+                    Dispatcher.BeginInvoke((Action)
+                        delegate
+                        {
+                            if (_videoEncoder == null)
+                                _videoEncoder = CreateVideoCompressorFilter();
+                            ShowFilterProperties(_videoEncoder);
+                        });
+                });
+            CancelCommand = new DelegateCommand(
+                delegate
+                {
+                    _cancelRequested = true;
+                },
+                delegate
+                {
+                    return _isTranscoding;
+                });
+        }
+
+        private void InitDispatcher()
+        {
+            this.Dispatcher = _graphPlayer.Dispatcher;
             Dispatcher.BeginInvoke(
                 (Action)delegate
                 {
@@ -54,32 +95,6 @@ namespace TranscodeToMP4.ViewModel
                     RaisePropertyChanged("VideoCompressorNames");
                     RaisePropertyChanged("AudioCompressors");
                     RaisePropertyChanged("AudioCompressorNames");
-                });
-
-            ChooseSourceFileCommand = new DelegateCommand(ChooseSource);
-            TranscodeCommand = new DelegateCommand(Transcode);
-            AudioEncoderPropertiesCommand = new DelegateCommand(
-                delegate
-                {
-                    if (_audioEncoder == null)
-                        _audioEncoder = CreateAudioCompressorFilter();
-                    ShowFilterProperties(_audioEncoder);
-                });
-            VideoEncoderPropertiesCommand = new DelegateCommand(
-                delegate
-                {
-                    if (_videoEncoder == null)
-                        _videoEncoder = CreateVideoCompressorFilter();
-                    ShowFilterProperties(_videoEncoder);
-                });
-            CancelCommand = new DelegateCommand(
-                delegate
-                {
-                    _cancelRequested = true;
-                },
-                delegate
-                {
-                    return _isTranscoding;
                 });
         }
 
@@ -96,8 +111,8 @@ namespace TranscodeToMP4.ViewModel
             set
             {
                 _graphPlayer = value;
-                if (_graphPlayer != null)
-                    _graphPlayer.SetSharedDispatcher(this.Dispatcher);
+                if (value != null && Dispatcher.DispatcherThread == null)
+                    InitDispatcher();
             }
         }
 
@@ -115,6 +130,8 @@ namespace TranscodeToMP4.ViewModel
         {
             if (!CheckAccess())
             {
+                if (Dispatcher.DispatcherThread == null)
+                    return;
                 Dispatcher.BeginInvoke((Action)DestroyPreviewGraph);
                 return;
             }
@@ -126,13 +143,17 @@ namespace TranscodeToMP4.ViewModel
                 _mediaCtrl.StopWhenReady();
                 //Marshal.ReleaseComObject(_previewPin);
                 //Marshal.ReleaseComObject(_nullRenderer);
-                Marshal.ReleaseComObject(_videoRenderer);
+                if (_videoRenderer != null)
+                    Marshal.ReleaseComObject(_videoRenderer);
                 //Marshal.ReleaseComObject(_videoDecoder);
                 //Marshal.ReleaseComObject(_splitter);
                 //Marshal.ReleaseComObject(_splitterFS);
                 Marshal.ReleaseComObject(_fileSource);
                 Marshal.ReleaseComObject(_graphBuilder);
                 Marshal.ReleaseComObject(_mediaCtrl);
+#if DEBUG
+                _dsRotEntry.Dispose();
+#endif
                 _videoRenderer = null;
                 _graphBuilder = null;
                 //_previewPin = null;
@@ -175,14 +196,20 @@ namespace TranscodeToMP4.ViewModel
             }
         }
 
+        DsROTEntry _dsRotEntry = null;
         private void ConstructSharedGraph()
         {
             if (!CheckAccess())
             {
+                if (Dispatcher.DispatcherThread == null)
+                    return;
                 Dispatcher.BeginInvoke((Action)ConstructSharedGraph);
                 return;
             }
-            _graphBuilder = (IGraphBuilder)new FilterGraphNoThread();
+            _graphBuilder = (IGraphBuilder)new FilterGraph();
+#if DEBUG
+            _dsRotEntry = new DsROTEntry((IFilterGraph)_graphBuilder);
+#endif
 
             //_splitter = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Haali Media Splitter");
             //if (_splitter == null)
@@ -201,6 +228,8 @@ namespace TranscodeToMP4.ViewModel
         {
             if (!CheckAccess())
             {
+                if (Dispatcher.DispatcherThread == null)
+                    return;
                 Dispatcher.BeginInvoke((Action)ConstructPreviewGraph);
                 return;
             }
@@ -222,14 +251,12 @@ namespace TranscodeToMP4.ViewModel
                 if (compressedAudioPin != null)
                 {
                     audioSubType = GetPinMediaSubType(compressedAudioPin);
-                    compressedAudioPin.Disconnect();
+                    //compressedAudioPin.Disconnect();
                 }
-                DisconnectAll(_fileSource);
+                //DisconnectAll(_fileSource);
 
                 _graphBuilder.RemoveFilter(nullVideo);
-                _graphBuilder.RemoveFilter(nullAudio);
                 Marshal.ReleaseComObject(nullVideo);
-                Marshal.ReleaseComObject(nullAudio);
 
                 Application.Current.Dispatcher.BeginInvoke(
                     delegate
@@ -250,10 +277,15 @@ namespace TranscodeToMP4.ViewModel
                     });
 
                 //HACK: for some reason, the standard Video Renderer sets up a better graph than VMR9 does
-                IPin decodePin = RenderForDumbPin();
+                IPin decodePin = RenderForDumbPin(compressedVideoPin);
                 _videoRenderer = _graphPlayer.CreateRenderer(_graphBuilder);
                 HookPinDirect(decodePin, _videoRenderer, 0);
                 Marshal.ReleaseComObject(decodePin);
+
+                _graphBuilder.RemoveFilter(nullAudio);
+                Marshal.ReleaseComObject(nullAudio);
+                Marshal.ReleaseComObject(compressedVideoPin);
+                Marshal.ReleaseComObject(compressedAudioPin);
 
                 //terminate the audio pin, so we can read its subtype
                 //_nullRenderer = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Null Renderer");
@@ -264,66 +296,61 @@ namespace TranscodeToMP4.ViewModel
 
                 _mediaCtrl.Run();
 
-                
             }
         }
 
+        const int NULL_RENDER_POOL_SIZE = 5;
         private void GetConnectNullRenderers(out IBaseFilter nullVideoRenderer, out IBaseFilter nullAudioRenderer)
         {
             nullVideoRenderer = null;
             nullAudioRenderer = null;
-            List<IBaseFilter> nullRenderList = new List<IBaseFilter>();
+            List<IBaseFilter> nullRenderPool = new List<IBaseFilter>();
             Random rand = new Random();
-
-            while (true)
+            for (int i = 0; i < NULL_RENDER_POOL_SIZE; i++)
             {
-                if (nullVideoRenderer != null && nullAudioRenderer != null)
-                    return;
                 IBaseFilter nullRenderer = (IBaseFilter)new NullRenderer();
                 int hr = _graphBuilder.AddFilter(nullRenderer, Convert.ToString(rand.Next()));
                 DsError.ThrowExceptionForHR(hr);
-                DisconnectAll(_fileSource);
-                RenderAll(_fileSource);
-                IPin connected = GetConnectedOut(nullRenderer, 0);
-                if (connected == null)
-                    break;
+                nullRenderPool.Add(nullRenderer);
+            }
 
-                nullRenderList.Add(nullRenderer);
-                bool anyUnconnected = false;
-                IBaseFilter anr = null;
-                IBaseFilter vnr = null;
-                nullRenderList.Do(
-                    delegate(IBaseFilter nr)
+            RenderAll(_fileSource);
+
+            IBaseFilter anr = null;
+            IBaseFilter vnr = null;
+            nullRenderPool.Do(
+                delegate(IBaseFilter nr)
+                {
+                    IPin co = null;
+                    AMMediaType mt = new AMMediaType();
+                    try
                     {
-                        IPin co = null;
-                        AMMediaType mt = new AMMediaType();
-                        try
+                        co = GetConnectedOut(nr, 0);
+                        if (co != null)
                         {
-                            co = GetConnectedOut(nr, 0);
                             co.ConnectionMediaType(mt);
                             if (mt.majorType == MediaType.Video)
                                 vnr = nr;
                             else if (mt.majorType == MediaType.Audio)
                                 anr = nr;
-
-                            if (co == null)
-                                anyUnconnected = true;
                         }
-                        finally
-                        {
+                    }
+                    finally
+                    {
+                        if (co != null)
                             Marshal.ReleaseComObject(co);
-                            DsUtils.FreeAMMediaType(mt);
-                        }
-                    });
-                nullAudioRenderer = anr;
-                nullVideoRenderer = vnr;
-            }
-            nullRenderList.Remove(nullAudioRenderer);
-            nullRenderList.Remove(nullVideoRenderer);
-            while (nullRenderList.Count > 0)
+                        DsUtils.FreeAMMediaType(mt);
+                    }
+                });
+            nullAudioRenderer = anr;
+            nullVideoRenderer = vnr;
+            nullRenderPool.Remove(nullAudioRenderer);
+            nullRenderPool.Remove(nullVideoRenderer);
+            while (nullRenderPool.Count > 0)
             {
-                var nr = nullRenderList[0];
-                nullRenderList.RemoveAt(0);
+                var nr = nullRenderPool[0];
+                _graphBuilder.RemoveFilter(nr);
+                nullRenderPool.RemoveAt(0);
                 Marshal.ReleaseComObject(nr);
             }
         }
@@ -338,6 +365,22 @@ namespace TranscodeToMP4.ViewModel
             while (pinEnum.Next(pins.Length, pins, IntPtr.Zero) == 0)
             {
                 int err = TryConnect(pins[0], destinationFilter, destinationPinIndex, out connectedDirectlyTo);
+                if (err == 0)
+                    return true;
+                Marshal.ReleaseComObject(pins[0]);
+            }
+            return false;
+        }
+
+        private bool TryConnectToAny(IPin sourcePin, IBaseFilter destinationFilter)
+        {
+            IEnumPins pinEnum;
+            int hr = destinationFilter.EnumPins(out pinEnum);
+            DsError.ThrowExceptionForHR(hr);
+            IPin[] pins = { null };
+            while (pinEnum.Next(pins.Length, pins, IntPtr.Zero) == 0)
+            {
+                int err = _graphBuilder.Connect(sourcePin, pins[0]);
                 if (err == 0)
                     return true;
                 Marshal.ReleaseComObject(pins[0]);
@@ -426,143 +469,195 @@ namespace TranscodeToMP4.ViewModel
         bool _isTranscoding = false;
         private void Transcode()
         {
-            //if (!CheckAccess())
-            //{
-            //    Dispatcher.BeginInvoke((Action)Transcode);
-            //    return;
-            //}
-            //lock (_syncGraph)
-            //{
-            //    _isTranscoding = true;
-            //    CancelCommand.RaiseCanExecuteChanged();
-            //    DestroyPreviewGraph();
-            //    ConstructSharedGraph();
+            if (!CheckAccess())
+            {
+                if (Dispatcher.DispatcherThread == null)
+                    return;
+                Dispatcher.BeginInvoke((Action)Transcode);
+                return;
+            }
+            lock (_syncGraph)
+            {
+                _isTranscoding = true;
+                CancelCommand.RaiseCanExecuteChanged();
+                DestroyPreviewGraph();
+                ConstructSharedGraph();
 
-            //    //set sync source to null to allow the graph to progress as quickly as possible
-            //    IMediaFilter mediaFilter = (IMediaFilter)_graphBuilder;
-            //    mediaFilter.SetSyncSource(null);
+                //set sync source to null to allow the graph to progress as quickly as possible
+                IMediaFilter mediaFilter = (IMediaFilter)_graphBuilder;
+                mediaFilter.SetSyncSource(null);
 
-            //    IBaseFilter muxer;
-            //    muxer = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Haali Matroska Muxer");
-            //    if (muxer == null)
-            //        Log.Error("Haali Matroska Muxer not found.");
-            //    IPropertyBag muxerPB = (IPropertyBag)muxer;
-            //    object pVar = 1;
-            //    int err = muxerPB.Write("FileType", ref pVar);
+                IBaseFilter nullVideo;
+                IBaseFilter nullAudio;
+                GetConnectNullRenderers(out nullVideo, out nullAudio);
+                IPin compressedVideoPin = GetConnectedOut(nullVideo, 0);
+                IPin compressedAudioPin = GetConnectedOut(nullAudio, 0);
 
-            //    IFileSinkFilter muxerFS = (IFileSinkFilter)muxer;
-            //    string tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-            //    err = muxerFS.SetFileName(tempPath, null);
+                IBaseFilter muxer;
+                muxer = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Haali Matroska Muxer");
+                if (muxer == null)
+                    Log.Error("Haali Matroska Muxer not found.");
+                IPropertyBag muxerPB = (IPropertyBag)muxer;
+                object pVar = 1;
+                int err = muxerPB.Write("FileType", ref pVar);
 
-            //    IBaseFilter pinTeeVideo = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Infinite Pin Tee Filter");
-            //    if (pinTeeVideo == null)
-            //        Log.Error("Infinite Pin Tee Filter not found.");
+                IFileSinkFilter muxerFS = (IFileSinkFilter)muxer;
+                string tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+                err = muxerFS.SetFileName(tempPath, null);
 
-            //    if (_currentVideoCompressor != null)
-            //    {
-            //        //we want to use intelligent connect to choose a decoder, but the pin tee isn't going to resolve it.
-            //        IPin decoderPin = DecodeForDumbPin(_splitter, 0);
+                if (compressedVideoPin == null)
+                    throw new ApplicationException("Unable to find video stream.");
+                string videoSubType = GetPinMediaSubType(compressedVideoPin);
+                compressedVideoPin.Disconnect();
 
-            //        _graphBuilder.AddFilter(pinTeeVideo, "pinTeeVideo");
-            //        HookPinDirect(decoderPin, pinTeeVideo, 0);
-            //        Marshal.ReleaseComObject(decoderPin);
+                string audioSubType = null;
+                if (compressedAudioPin != null)
+                {
+                    audioSubType = GetPinMediaSubType(compressedAudioPin);
+                    compressedAudioPin.Disconnect();
+                }
 
-            //        if (_videoEncoder == null)
-            //            _videoEncoder = CreateVideoCompressorFilter();
-            //        _graphBuilder.AddFilter(_videoEncoder, "videoEncoder");
-            //        HookPin(pinTeeVideo, 0, _videoEncoder, 0);
-            //        err = _graphBuilder.AddFilter(muxer, "muxer");
-            //        HookPin(_videoEncoder, 0, muxer, 0);
+                _graphBuilder.RemoveFilter(nullVideo);
+                Marshal.ReleaseComObject(nullVideo);
+                _graphBuilder.RemoveFilter(nullAudio);
+                Marshal.ReleaseComObject(nullAudio);
 
-            //        _videoRenderer = _graphPlayer.CreateRenderer(_graphBuilder);
-            //        HookPin(pinTeeVideo, 1, _videoRenderer, 0);
-            //        //_previewPin = DsFindPin.ByDirection(pinTeeVideo, PinDirection.Output, 1);
-            //    }
-            //    else
-            //    {
-            //        _graphBuilder.AddFilter(pinTeeVideo, "pinTeeVideo");
-            //        HookPin(_splitter, 0, pinTeeVideo, 0);
-            //        err = _graphBuilder.AddFilter(muxer, "muxer");
-            //        HookPin(pinTeeVideo, 0, muxer, 0);
+                IBaseFilter pinTeeVideo = CreateFilter(FilterCategory.LegacyAmFilterCategory, "Infinite Pin Tee Filter");
+                if (pinTeeVideo == null)
+                    Log.Error("Infinite Pin Tee Filter not found.");
 
-            //        IPin decoderPin = DecodeForDumbPin(pinTeeVideo, 1);
-            //        _videoRenderer = _graphPlayer.CreateRenderer(_graphBuilder);
-            //        HookPin(decoderPin, _videoRenderer, 0);
-            //        Marshal.ReleaseComObject(decoderPin);
-            //        //_previewPin = DecodeForDumbPin(pinTeeVideo, 0);
-            //    }
+                if (_currentVideoCompressor != null)
+                {
+                    //we want to use intelligent connect to choose a decoder, but the pin tee isn't going to resolve it.
+                    IPin decoderPin = RenderForDumbPin(compressedVideoPin);
 
-            //    if (_currentAudioCompressor != null)
-            //    {
-            //        if (_audioEncoder == null)
-            //            _audioEncoder = CreateAudioCompressorFilter();
-            //        _graphBuilder.AddFilter(_audioEncoder, "audioEncoder");
-            //        HookPin(_splitter, 1, _audioEncoder, 0);
-            //        HookPin(_audioEncoder, 0, muxer, 1);
-            //    }
-            //    else
-            //        HookPin(_splitter, 1, muxer, 1);
+                    _graphBuilder.AddFilter(pinTeeVideo, "pinTeeVideo");
+                    HookPinDirect(decoderPin, pinTeeVideo, 0);
+                    Marshal.ReleaseComObject(decoderPin);
 
-            //    IMediaPosition mediaPos = (IMediaPosition)_graphBuilder;
-            //    IMediaEvent medEvent = (IMediaEvent)_graphBuilder;
-            //    EventCode eventCode;
-            //    err = _mediaCtrl.Run();
-            //    ProgressIsIndeterminate = false;
-            //    RaisePropertyChanged("ProgressIsIndeterminate");
-            //    var timer = new DispatcherTimer(DispatcherPriority.Background);
-            //    timer.Interval = TimeSpan.FromMilliseconds(500);
-            //    timer.Tick +=
-            //        delegate
-            //        {
-            //            double current = 0;
-            //            double duration = 0;
-            //            if (!_cancelRequested)
-            //            {
-            //                err = mediaPos.get_CurrentPosition(out current);
-            //                err = mediaPos.get_Duration(out duration);
-            //            }
-            //            if (current < duration && !_cancelRequested)
-            //            {
-            //                ProgressValue = (current / duration) * 10000;
-            //                RaisePropertyChanged("ProgressValue");
-            //            }
-            //            else
-            //            {
-            //                ProgressValue = 0;
-            //                RaisePropertyChanged("ProgressValue");
-            //                ProgressIsIndeterminate = true;
-            //                RaisePropertyChanged("ProgressIsIndeterminate");
-            //                int waitRes = S_OK;
-            //                if (!_cancelRequested)
-            //                    waitRes = medEvent.WaitForCompletion(1, out eventCode);
-            //                if (waitRes == S_OK || waitRes == VFW_E_WRONG_STATE)
-            //                {
-            //                    timer.Stop();
-            //                    err = _mediaCtrl.StopWhenReady();
-            //                    ProgressIsIndeterminate = false;
-            //                    RaisePropertyChanged("ProgressIsIndeterminate");
+                    if (_videoEncoder == null)
+                        _videoEncoder = CreateVideoCompressorFilter();
+                    _graphBuilder.AddFilter(_videoEncoder, "videoEncoder");
+                    HookPin(pinTeeVideo, 0, _videoEncoder, 0);
+                    err = _graphBuilder.AddFilter(muxer, "muxer");
+                    HookPin(_videoEncoder, 0, muxer, 0);
 
-            //                    DestroyAudioEncoder();
-            //                    DestroyVideoEncoder();
-            //                    Marshal.ReleaseComObject(pinTeeVideo);
-            //                    Marshal.ReleaseComObject(muxer);
-            //                    Marshal.ReleaseComObject(muxerPB);
-            //                    Marshal.ReleaseComObject(muxerFS);
-            //                    DestroyPreviewGraph();
-            //                    Marshal.ReleaseComObject(mediaFilter);
-            //                    Marshal.ReleaseComObject(mediaPos);
-            //                    Marshal.ReleaseComObject(medEvent);
-            //                    _cancelRequested = false;
-            //                    _isTranscoding = false;
-            //                    CancelCommand.RaiseCanExecuteChanged();
-            //                }
-            //            }
-            //        };
-            //    timer.Start();
-            //}
+                    _videoRenderer = _graphPlayer.CreateRenderer(_graphBuilder);
+                    HookPin(pinTeeVideo, 1, _videoRenderer, 0);
+                    //_previewPin = DsFindPin.ByDirection(pinTeeVideo, PinDirection.Output, 1);
+                }
+                else
+                {
+                    IPin decoderPin = RenderForDumbPin(compressedVideoPin);
+                    PinInfo decoderPinInfo;
+                    decoderPin.QueryPinInfo(out decoderPinInfo);
+                    IBaseFilter decoderFilter = decoderPinInfo.filter;
+                    compressedVideoPin.Disconnect();
+                    DisconnectAll(decoderFilter);
+
+                    _graphBuilder.AddFilter(pinTeeVideo, "pinTeeVideo");
+                    HookPin(compressedVideoPin, pinTeeVideo, 0);
+
+                    _videoRenderer = _graphPlayer.CreateRenderer(_graphBuilder);
+                    IPin pinTeeOut0 = DsFindPin.ByDirection(pinTeeVideo, PinDirection.Output, 0);
+                    TryConnectToAny(pinTeeOut0, decoderFilter);
+                    
+                    err = _graphBuilder.Render(decoderPin);
+                    DsError.ThrowExceptionForHR(err);
+
+                    err = _graphBuilder.AddFilter(muxer, "muxer");
+                    HookPin(pinTeeVideo, 1, muxer, 0);
+
+                    Marshal.ReleaseComObject(pinTeeOut0);
+                    Marshal.ReleaseComObject(decoderPin);
+                    //_previewPin = DecodeForDumbPin(pinTeeVideo, 0);
+                }
+                Marshal.ReleaseComObject(compressedVideoPin);
+
+                if (compressedAudioPin != null)
+                {
+                    if (_currentAudioCompressor != null)
+                    {
+                        if (_audioEncoder == null)
+                            _audioEncoder = CreateAudioCompressorFilter();
+                        _graphBuilder.AddFilter(_audioEncoder, "audioEncoder");
+                        HookPin(compressedAudioPin, _audioEncoder, 0);
+                        HookPin(_audioEncoder, 0, muxer, 1);
+                    }
+                    else
+                        HookPin(compressedAudioPin, muxer, 1);
+                    Marshal.ReleaseComObject(compressedAudioPin);
+                }
+
+                err = _mediaCtrl.Run();
+                ProgressIsIndeterminate = false;
+                RaisePropertyChanged("ProgressIsIndeterminate");
+                var timer = new DispatcherTimer(DispatcherPriority.Background, Application.Current.Dispatcher);
+                timer.Interval = TimeSpan.FromMilliseconds(500);
+                timer.Tick +=
+                    delegate
+                    {
+                        Dispatcher.BeginInvoke(
+                            (Action)delegate
+                            {
+                                lock (_syncGraph)
+                                {
+                                    if (_graphBuilder == null)
+                                        return;
+                                    IMediaPosition mediaPos = (IMediaPosition)_graphBuilder;
+                                    IMediaEvent medEvent = (IMediaEvent)_graphBuilder;
+                                    EventCode eventCode;
+                                    double current = 0;
+                                    double duration = 0;
+                                    if (!_cancelRequested)
+                                    {
+                                        err = mediaPos.get_CurrentPosition(out current);
+                                        err = mediaPos.get_Duration(out duration);
+                                    }
+                                    if (current < duration && !_cancelRequested)
+                                    {
+                                        ProgressValue = (current / duration) * 10000;
+                                        RaisePropertyChanged("ProgressValue");
+                                    }
+                                    else
+                                    {
+                                        ProgressValue = 0;
+                                        RaisePropertyChanged("ProgressValue");
+                                        ProgressIsIndeterminate = true;
+                                        RaisePropertyChanged("ProgressIsIndeterminate");
+                                        int waitRes = S_OK;
+                                        if (!_cancelRequested)
+                                            waitRes = medEvent.WaitForCompletion(1, out eventCode);
+                                        if (waitRes == S_OK || waitRes == VFW_E_WRONG_STATE)
+                                        {
+                                            timer.Stop();
+                                            err = _mediaCtrl.StopWhenReady();
+                                            ProgressIsIndeterminate = false;
+                                            RaisePropertyChanged("ProgressIsIndeterminate");
+
+                                            DestroyAudioEncoder();
+                                            DestroyVideoEncoder();
+                                            Marshal.ReleaseComObject(pinTeeVideo);
+                                            Marshal.ReleaseComObject(muxer);
+                                            Marshal.ReleaseComObject(muxerPB);
+                                            Marshal.ReleaseComObject(muxerFS);
+                                            DestroyPreviewGraph();
+                                            Marshal.ReleaseComObject(mediaFilter);
+                                            Marshal.ReleaseComObject(mediaPos);
+                                            Marshal.ReleaseComObject(medEvent);
+                                            _cancelRequested = false;
+                                            _isTranscoding = false;
+                                            CancelCommand.RaiseCanExecuteChanged();
+                                        }
+                                    }
+                                }
+                            });
+                    };
+                timer.Start();
+            }
         }
 
-        private IPin RenderForDumbPin()
+        private IPin RenderForDumbPin(IPin renderPin)
         {
             IPin inPin = null;
             IBaseFilter tempRenderer = null;
@@ -570,12 +665,15 @@ namespace TranscodeToMP4.ViewModel
             {
                 tempRenderer = (IBaseFilter)new VideoRenderer();
                 _graphBuilder.AddFilter(tempRenderer, null);
-                RenderAll(_fileSource);
+                //DisconnectAll(_fileSource);
+                //RenderAll(_fileSource);
                 //HookPin(sourcePin, tempRenderer, 0);
-                inPin = DsFindPin.ByDirection(tempRenderer, PinDirection.Input, 0);
+                //inPin = DsFindPin.ByDirection(tempRenderer, PinDirection.Input, 0);
                 IPin outPin;
-                int hr = inPin.ConnectedTo(out outPin);
-                DsError.ThrowExceptionForHR(hr);
+                //int hr = inPin.ConnectedTo(out outPin);
+                //DsError.ThrowExceptionForHR(hr);
+                int err = TryConnect(renderPin, tempRenderer, 0, out outPin);
+                DsError.ThrowExceptionForHR(err);
                 outPin.Disconnect();
                 return outPin;
             }
@@ -583,8 +681,8 @@ namespace TranscodeToMP4.ViewModel
             {
                 if (tempRenderer != null)
                 {
-                    Marshal.ReleaseComObject(tempRenderer);
                     _graphBuilder.RemoveFilter(tempRenderer);
+                    Marshal.ReleaseComObject(tempRenderer);
                 }
                 if (inPin != null)
                     Marshal.ReleaseComObject(inPin);
@@ -839,8 +937,8 @@ namespace TranscodeToMP4.ViewModel
                 DsError.ThrowExceptionForHR(err);
 
                 object filterObject = (object)filter;
-                err = OleCreatePropertyFrame(new WindowInteropHelper(Application.Current.MainWindow).Handle
-                    , 0, 0, filterInfo.achName, 1, ref filterObject, caGuid.cElems, caGuid.pElems, 0, 0, IntPtr.Zero);
+                err = OleCreatePropertyFrame(IntPtr.Zero, 0, 0, filterInfo.achName, 1, ref filterObject,
+                    caGuid.cElems, caGuid.pElems, 0, 0, IntPtr.Zero);
                 DsError.ThrowExceptionForHR(err);
 
                 Marshal.FreeCoTaskMem(caGuid.pElems);
@@ -851,8 +949,7 @@ namespace TranscodeToMP4.ViewModel
                 IAMVfwCompressDialogs compDialogs = filter as IAMVfwCompressDialogs;
                 if (compDialogs != null)
                 {
-                    err = compDialogs.ShowDialog(VfwCompressDialogs.Config,
-                        new WindowInteropHelper(Application.Current.MainWindow).Handle);
+                    err = compDialogs.ShowDialog(VfwCompressDialogs.Config, IntPtr.Zero);
                     DsError.ThrowExceptionForHR(err);
                 }
             }

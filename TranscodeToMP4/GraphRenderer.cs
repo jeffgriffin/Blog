@@ -38,10 +38,9 @@ namespace TranscodeToMP4
 
     public class GraphPlayer : WPFMediaKit.DirectShow.MediaPlayers.MediaPlayerBase
     {
-        public void SetSharedDispatcher(WorkDispatcher dispatcher)
+        public GraphPlayer()
         {
-            Dispatcher.BeginInvokeShutdown();
-            Dispatcher = dispatcher;
+            EnsureThread(System.Threading.ApartmentState.STA);
         }
 
         public IBaseFilter CreateRenderer(IGraphBuilder graph)
