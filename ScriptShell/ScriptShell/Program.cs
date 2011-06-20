@@ -59,6 +59,7 @@ Options:
             }
             List<string> runFiles = new List<string>();
             bool automatedMode = false;
+            string[] passArgs = null;
 
             IEnumerable<string> files = args.TakeWhile(arg => !arg.StartsWith("-"));
             foreach (string sFile in files)
@@ -116,6 +117,10 @@ Options:
                     case "-a":
                         automatedMode = true;
                         break;
+                    case "-p":
+                        passArgs = args.Skip(i + 1).TakeWhile(arg => !arg.StartsWith("-")).ToArray();
+                        i += passArgs.Length;
+                        break;
                     default:
                         Console.WriteLine("Unrecognized parameter: " + args[i]);
                         Console.WriteLine(USAGE);
@@ -131,11 +136,11 @@ Options:
                     {
                         Console.WriteLine("{0} is a PowerShell script.  Run this script now? ([y]/n).", Path.GetFileName(scriptFile));
                         if (Console.ReadKey().Key != ConsoleKey.N)
-                            PowerShellRunner.Run(scriptFile);
+                            PowerShellRunner.Run(scriptFile, passArgs);
                         Console.WriteLine();
                     }
                     else
-                        PowerShellRunner.Run(scriptFile);
+                        PowerShellRunner.Run(scriptFile, passArgs);
                 }
                 else if (scriptFile.EndsWith(".py") || scriptFile.EndsWith(".griffpy"))
                 {

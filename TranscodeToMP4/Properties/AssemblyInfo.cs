@@ -10,9 +10,9 @@ using System.Windows;
 [assembly: AssemblyTitle("TranscodeToMP4")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("GriffinSCS")]
 [assembly: AssemblyProduct("TranscodeToMP4")]
-[assembly: AssemblyCopyright("Copyright ©  2011")]
+[assembly: AssemblyCopyright("© Jeff Griffin 2011")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

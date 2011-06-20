@@ -61,8 +61,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\EntLib50Src\bin\Microsoft.Practices.ServiceLocation.dll</HintPath>
     </Reference>
-    <Reference Include="net.visibleblue.util, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="ShaderEffectLibrary, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL" />
     <Reference Include="System" />
     <Reference Include="System.configuration" />
     <Reference Include="System.Data" />
@@ -99,9 +97,8 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="Ref\ResourceReferenceResolver.cs" />
-    <Compile Include="Model\AboutViewModel.cs" />
-    <Compile Include="Model\PrimaryModel.cs" />
+    <Compile Include="ViewModel\AboutViewModel.cs" />
+    <Compile Include="ViewModel\PrimaryViewModel.cs" />
     <Page Include="AboutDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -150,6 +147,16 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\WPFSFL\WPFSLFx\WPF\ShaderEffectLibrary\WPFShaderEffectLibrary.csproj">
+      <Project>{967D61A9-C8F0-4C2A-A784-6CDA648ECB19}</Project>
+      <Name>WPFShaderEffectLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\net.visibleblue\net.visibleblue.util\net.visibleblue.util.csproj">
+      <Project>{853E87B5-C2AA-4000-8C3B-82D59A473C69}</Project>
+      <Name>net.visibleblue.util</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Resource Include="Images\start.png" />
     <Resource Include="Images\cancel.png" />
     <Resource Include="Images\settings.png" />
@@ -161,11 +168,6 @@
   <ItemGroup>
     <Resource Include="Images\jeff.ico" />
   </ItemGroup>
-  <ItemGroup>
-    <Resource Include="License.txt" />
-    <Content Include="Ref\net.visibleblue.util.dll" />
-    <Content Include="Ref\ShaderEffectLibrary.dll" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
@@ -174,15 +176,4 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-  <Target Name="AfterResolveReferences">
-    <ItemGroup>
-      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
-        <LogicalName>%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
-      </EmbeddedResource>
-    </ItemGroup>
-  </Target>
-  <Target Name="AfterBuild">
-    <Delete Files="$(OutDir)(ReferenceCopyLocalPaths.Extension)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
-    <Message Text="DELETED: %(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'" Importance="high" />
-  </Target>
 </Project>

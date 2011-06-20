@@ -10,53 +10,40 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using TranscodeToMP4.Model;
-using ShaderEffectLibrary;
+using Microsoft.Win32;
 
-namespace TranscodeToMP4
+namespace TranscodeToMP4.Model
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    public class AboutViewModel
     {
-        public MainWindow()
+        public string AssemblyVersion
         {
-            DataContext = new PrimaryModel();
-            InitializeComponent();
-            ((PrimaryModel)DataContext).LogEntries.CollectionChanged += LogEntries_CollectionChanged;
+            get
+            {
+                object[] attributes = Assembly.GetEntryAssembly().GetCustomAttributes(typeof(AssemblyFileVersionAttribute), false);
+                if (attributes.Length == 0)
+                {
+                    return "";
+                }
+                return ((AssemblyFileVersionAttribute)attributes[0]).Version;
+            }
         }
 
-        void LogEntries_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        public string AssemblyCopyright
         {
-            _logScrollViewer.ScrollToBottom();
-        }
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            ((PrimaryModel)DataContext).Dispose();
-        }
-
-        private void About_Click(object sender, RoutedEventArgs e)
-        {
-            AboutDialog dialog = new AboutDialog();
-            dialog.DataContext = new AboutViewModel();
-            dialog.Owner = this;
-            this.Effect = new MonochromeEffect() { FilterColor = Colors.LightSteelBlue };
-            dialog.ShowDialog();
-            this.Effect = null;
-            dialog.Close();
+            get
+            {
+                object[] attributes = Assembly.GetEntryAssembly().GetCustomAttributes(typeof(AssemblyCopyrightAttribute), false);
+                if (attributes.Length == 0)
+                {
+                    return "";
+                }
+                return ((AssemblyCopyrightAttribute)attributes[0]).Copyright;
+            }
         }
     }
 }

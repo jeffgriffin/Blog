@@ -1,0 +1,28 @@
+﻿<Window x:Class="TranscodeToMP4.AboutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        WindowStyle="ToolWindow"
+        ResizeMode="NoResize"
+        Background="Black">
+    <Window.Resources>
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+        <Style x:Key="LinkText"  TargetType="{x:Type TextBlock}" />
+    </Window.Resources>
+    <Grid Margin="10">
+        <StackPanel>
+            <TextBlock Text="Transcode to MP4" FontSize="20" Foreground="SteelBlue" FontWeight="DemiBold"/>
+            <TextBlock Text="{Binding StringFormat=Version {0}, Path=AssemblyVersion}" />
+            <TextBlock Text="{Binding AssemblyCopyright}" />
+            <TextBlock Text="GriffinSCS" />
+            <TextBlock>
+                <Hyperlink NavigateUri="http://griffinscs.com/" RequestNavigate="HyperlinkRequestNavigate">
+                    <TextBlock Style="{StaticResource LinkText}" Text="Blog" />
+                </Hyperlink>
+            </TextBlock>
+        </StackPanel>
+    </Grid>
+</Window>

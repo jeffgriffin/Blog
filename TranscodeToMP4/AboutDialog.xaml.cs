@@ -19,44 +19,33 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
-using TranscodeToMP4.Model;
-using ShaderEffectLibrary;
+using System.Diagnostics;
+using System.ComponentModel;
 
 namespace TranscodeToMP4
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for AboutDialog.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class AboutDialog : Window
     {
-        public MainWindow()
+        public AboutDialog()
         {
-            DataContext = new PrimaryModel();
             InitializeComponent();
-            ((PrimaryModel)DataContext).LogEntries.CollectionChanged += LogEntries_CollectionChanged;
         }
 
-        void LogEntries_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void HyperlinkRequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
         {
-            _logScrollViewer.ScrollToBottom();
-        }
+            try
+            {
+                Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+            }
+            catch (Win32Exception)
+            {
+            }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            ((PrimaryModel)DataContext).Dispose();
-        }
-
-        private void About_Click(object sender, RoutedEventArgs e)
-        {
-            AboutDialog dialog = new AboutDialog();
-            dialog.DataContext = new AboutViewModel();
-            dialog.Owner = this;
-            this.Effect = new MonochromeEffect() { FilterColor = Colors.LightSteelBlue };
-            dialog.ShowDialog();
-            this.Effect = null;
-            dialog.Close();
+            e.Handled = true;
         }
     }
 }

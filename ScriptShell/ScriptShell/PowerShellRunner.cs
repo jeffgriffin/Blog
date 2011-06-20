@@ -204,9 +204,11 @@ namespace ScriptShell
             }
         }
 
-        public static void Run(string file)
+        public static void Run(string file, params string[] args)
         {
             PowerShell.AddScript(File.ReadAllText(file));
+            foreach (var arg in args)
+                PowerShell.AddArgument(arg);
             PowerShell.AddCommand("Out-Default");
             try { PowerShell.Invoke(); }
             catch (Exception e)
