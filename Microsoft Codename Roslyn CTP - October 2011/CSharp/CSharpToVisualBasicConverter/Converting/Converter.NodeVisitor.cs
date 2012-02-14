@@ -786,47 +786,6 @@ namespace CSharpToVisualBasicConverter.Converting
                     ConvertTypeArguments(node.TypeArgumentList));
             }
 
-            protected override VB.SyntaxNode VisitTypeParameterConstraintClause(CS.TypeParameterConstraintClauseSyntax node)
-            {
-                if(node.Constraints.Count==1)
-                {
-                    return VB.Syntax.TypeParameterSingleConstraintClause(
-                        VB.Syntax.Token(VB.SyntaxKind.AsKeyword),
-                        Visit<VB.ConstraintSyntax>(node.Constraints.Single()));
-                }
-                else if(node.Constraints.Count>1)
-                {
-                    return VB.Syntax.TypeParameterMultipleConstraintClause(
-                                VB.Syntax.Token(VB.SyntaxKind.AsKeyword),
-                                VB.Syntax.Token(VB.SyntaxKind.OpenBraceToken),
-                                SeparatedCommaList<VB.ConstraintSyntax>(node.Constraints.Select(Visit<VB.ConstraintSyntax>)));
-                }
-                return null;
-            }
-
-            protected override VB.SyntaxNode VisitTypeConstraint(CS.TypeConstraintSyntax node)
-            {
-                return VB.Syntax.TypeConstraint(VisitType(node.Type));
-            }
-
-            protected override VB.SyntaxNode VisitConstructorConstraint(CS.ConstructorConstraintSyntax node)
-            {
-                return VB.Syntax.NewConstraint(VB.Syntax.Token(VB.SyntaxKind.NewKeyword));
-            }
-
-            protected override VB.SyntaxNode VisitClassOrStructConstraint(CS.ClassOrStructConstraintSyntax node)
-            {
-                switch (node.Kind)
-                {
-                    case CS.SyntaxKind.ClassConstraint:
-                        return VB.Syntax.SpecialConstraint(VB.SyntaxKind.ClassConstraint, VB.Syntax.Token(VB.SyntaxKind.ClassKeyword));
-                    case CS.SyntaxKind.StructConstraint:
-                        return VB.Syntax.SpecialConstraint(VB.SyntaxKind.StructureConstraint, VB.Syntax.Token(VB.SyntaxKind.StructureKeyword));
-                }
-
-                return base.VisitClassOrStructConstraint(node);
-            }
-
             protected override VB.SyntaxNode VisitTypeParameter(CS.TypeParameterSyntax node)
             {
                 var variance = node.VarianceKeywordOpt.Kind == CS.SyntaxKind.None
@@ -834,22 +793,12 @@ namespace CSharpToVisualBasicConverter.Converting
                     : node.VarianceKeywordOpt.Kind == CS.SyntaxKind.InKeyword
                         ? VB.Syntax.Token(VB.SyntaxKind.InKeyword)
                         : VB.Syntax.Token(VB.SyntaxKind.OutKeyword);
-                //((Roslyn.Compilers.CSharp.TypeDeclarationSyntax)((((Roslyn.Compilers.CSharp.SyntaxNode)(node)).Parent).Parent)).ConstraintClauses
-                //((Roslyn.Compilers.CSharp.MethodDeclarationSyntax)((((Roslyn.Compilers.CSharp.SyntaxNode)(node)).Parent).Parent)).ConstraintClauses
-                //((Roslyn.Compilers.CSharp.DelegateDeclarationSyntax)((((Roslyn.Compilers.CSharp.SyntaxNode)(node)).Parent).Parent)).ConstraintClauses
-                VB.TypeParameterConstraintClauseSyntax vbTypeConstraintClause = null;
-                if(node.Parent.Parent is CS.TypeDeclarationSyntax || node.Parent.Parent is  CS.MethodDeclarationSyntax || node.Parent.Parent is CS.DelegateDeclarationSyntax)
-                {
-                    CS.SyntaxList<CS.TypeParameterConstraintClauseSyntax> constraintClauses = ((dynamic)node.Parent.Parent).ConstraintClauses;
-                    var paramClause = constraintClauses.Where(clause => clause.Identifier.GetFullText().Equals(node.Identifier.GetFullText())).SingleOrDefault() as CS.TypeParameterConstraintClauseSyntax;
-                    if (paramClause != null)
-                        vbTypeConstraintClause = VisitTypeParameterConstraintClause(paramClause) as VB.TypeParameterConstraintClauseSyntax;
-                }
 
+                // TODO: get the constraints.
                 return VB.Syntax.TypeParameter(
                     variance,
                     ConvertIdentifier(node.Identifier),
-                    vbTypeConstraintClause);
+                    null);
             }
 
             protected override VB.SyntaxNode VisitPredefinedType(CS.PredefinedTypeSyntax node)
