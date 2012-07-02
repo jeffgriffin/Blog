@@ -841,7 +841,7 @@ namespace CSharpToVisualBasicConverter.Converting
                 if(node.Parent.Parent is CS.TypeDeclarationSyntax || node.Parent.Parent is  CS.MethodDeclarationSyntax || node.Parent.Parent is CS.DelegateDeclarationSyntax)
                 {
                     CS.SyntaxList<CS.TypeParameterConstraintClauseSyntax> constraintClauses = ((dynamic)node.Parent.Parent).ConstraintClauses;
-                    var paramClause = constraintClauses.Where(clause => clause.Identifier.GetFullText().Equals(node.Identifier.GetFullText())).SingleOrDefault() as CS.TypeParameterConstraintClauseSyntax;
+                    var paramClause = constraintClauses.Where(clause => clause.Identifier.ValueText.Equals(node.Identifier.ValueText)).SingleOrDefault() as CS.TypeParameterConstraintClauseSyntax;
                     if (paramClause != null)
                         vbTypeConstraintClause = VisitTypeParameterConstraintClause(paramClause) as VB.TypeParameterConstraintClauseSyntax;
                 }
